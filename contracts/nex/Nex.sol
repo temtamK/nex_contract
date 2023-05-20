@@ -5,16 +5,27 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
+import "@opengsn/contracts/src/ERC2771Recipient.sol";
+
 import "./IContractURI.sol";
 import "./IProxyRegistry.sol";
 import "./INex.sol";
 
-contract Nex is Ownable, Pausable, ERC721, IContractURI, INex {
+contract Nex is
+    Ownable,
+    Pausable,
+    ERC721,
+    IContractURI,
+    INex,
+    ERC2771Recipient
+{
     /// @inheritdoc IContractURI
     string public override contractURI;
 
     /// @inheritdoc INex
     uint256 public override totalSupply;
+
+    uint256 public balances; //각 계좌의 잔액을 저장하기 위한 매핑 변수 추가
 
     // OpenSea Proxy Registry address
     // address internal constant OPENSEA_PROXY_REGISTRY =
@@ -25,20 +36,25 @@ contract Nex is Ownable, Pausable, ERC721, IContractURI, INex {
 
     mapping(uint => string) public metadataURIs;
 
-    /// @notice Creates Zerion DNA 1.0
-    constructor() ERC721("NEX", "NEX") {
+    constructor(address forwarder) payable ERC721("NEX", "NEX") {
         // _pause();
+        _setTrustedForwarder(forwarder);
+    }
+
+    function getTotalSupply() public view returns (uint256) {
+        return totalSupply;
     }
 
     /// @inheritdoc INex
-    function setBaseURI(uint tokenId, string memory newBaseURI) external override onlyOwner {
+    function setBaseURI(
+        uint tokenId,
+        string memory newBaseURI
+    ) external override {
         metadataURIs[tokenId] = newBaseURI;
     }
 
     /// @inheritdoc INex
-    function setContractURI(
-        string memory newContractURI
-    ) external override onlyOwner {
+    function setContractURI(string memory newContractURI) external override {
         contractURI = newContractURI;
     }
 
@@ -87,5 +103,34 @@ contract Nex is Ownable, Pausable, ERC721, IContractURI, INex {
         _requireMinted(tokenId);
 
         return metadataURIs[tokenId];
+    }
+
+    function _msgSender()
+        internal
+        view
+        override(Context, ERC2771Recipient)
+        returns (address sender)
+    {
+        sender = ERC2771Recipient._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        override(Context, ERC2771Recipient)
+        returns (bytes calldata)
+    {
+        return ERC2771Recipient._msgData();
+    }
+
+    function eventPrize(address to, uint256 prize) public {
+        // uint amount = pendingWithdrawals[sender];
+        // 리엔트란시(re-entrancy) 공격을 예방하기 위해
+        // 송금하기 전에 보류중인 환불을 0으로 기억해 두십시오.
+        payable(to).transfer(prize);
+    }
+
+    function receivePayment() public payable {
+        balances += msg.value;
     }
 }

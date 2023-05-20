@@ -2,7 +2,10 @@ import { ethers } from "hardhat";
 
 async function main() {
   const Nex = await ethers.getContractFactory("Nex");
-  const nex = await Nex.deploy();
+  const nex = await Nex.deploy("0x52C84043CD9c865236f11d9Fc9F56aa003c1f922");
+
+  // const forwarder = await ethers.getContractFactory("Forwarder");
+  // const forwarderDeployed = await forwarder.deploy();
 
   console.log(
     "Nex deployed to:", nex.address);
